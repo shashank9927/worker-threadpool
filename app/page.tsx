@@ -276,9 +276,9 @@ export default function Home() {
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Real-Time Task Queue</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Real-Time Worker Queue</h1>
             <p className="text-muted-foreground">
-              Distributed processing with worker threads
+              Concurrent processing with worker threads & priority scheduling
             </p>
           </div>
           <div className="flex items-center gap-2">

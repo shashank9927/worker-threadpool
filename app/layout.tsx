@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Real-Time Task Queue",
-  description: "Distributed task queue with real-time updates",
+  title: "Real-Time Worker Queue",
+  description: "Concurrent processing with worker threads & priority scheduling",
 };
 
 export default function RootLayout({
