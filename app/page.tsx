@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import { StatsBar } from "@/components/StatsBar";
 import { WorkerPool } from "@/components/WorkerPool";
@@ -38,6 +38,22 @@ interface Worker {
   progress?: number;
 }
 
+interface JobProgressEvent {
+  jobId: string;
+  progress: number;
+  workerId: number;
+}
+
+interface WorkerStatusEvent {
+  workerId: number;
+  status: "IDLE" | "BUSY";
+  currentJobId?: string;
+}
+
+interface WorkerRestartedEvent {
+  workerId: number;
+}
+
 export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([
@@ -49,6 +65,14 @@ export default function Home() {
   const [countdown, setCountdown] = useState(60);
   const [clientId] = useState(() => `client_${Math.random().toString(36).substring(2, 11)}`);
   const socketRef = useRef<Socket | null>(null);
+
+  const fetchJobs = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/jobs?clientId=${clientId}`);
+      const data = await response.json();
+      setJobs(data);
+    } catch {}
+  }, [clientId]);
 
   useEffect(() => {
     const socket = io(API_URL);
@@ -77,12 +101,12 @@ export default function Home() {
       setJobs(prev => prev.map(j => (j._id === job._id ? updatedJob : j)));
     });
 
-    socket.on("job:progress", ({ jobId, progress, workerId }: any) => {
+    socket.on("job:progress", ({ jobId, progress, workerId }: JobProgressEvent) => {
       setJobs(prev => prev.map(j => (j._id === jobId ? { ...j, progress } : j)));
       setWorkers(prev => prev.map(w => (w.id === workerId ? { ...w, progress } : w)));
     });
 
-    socket.on("worker:status", ({ workerId, status, currentJobId }: any) => {
+    socket.on("worker:status", ({ workerId, status, currentJobId }: WorkerStatusEvent) => {
       setWorkers(prev =>
         prev.map(w =>
           w.id === workerId
@@ -92,7 +116,7 @@ export default function Home() {
       );
     });
 
-    socket.on("worker:restarted", ({ workerId }: any) => {
+    socket.on("worker:restarted", ({ workerId }: WorkerRestartedEvent) => {
       toast.success(`Worker ${workerId} restarted`, {
         description: "Worker thread terminated and recreated",
       });
@@ -108,7 +132,7 @@ export default function Home() {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, [fetchJobs]);
 
   useEffect(() => {
     if (!connected && isWakingUp && countdown > 0) {
@@ -118,14 +142,6 @@ export default function Home() {
       return () => clearInterval(timer);
     }
   }, [connected, isWakingUp, countdown]);
-
-  const fetchJobs = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/jobs?clientId=${clientId}`);
-      const data = await response.json();
-      setJobs(data);
-    } catch {}
-  };
 
   const createJob = async (taskName: string, priority: string, intensity: number) => {
     try {
