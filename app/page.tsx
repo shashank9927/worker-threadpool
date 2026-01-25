@@ -123,7 +123,7 @@ export default function Home() {
     });
 
     socket.on("system-alert", ({ message }: { message: string; workerId: number }) => {
-      toast.warning("⚠️ System Recovery", {
+      toast.warning("System Recovery", {
         description: message,
         duration: 5000,
       });
