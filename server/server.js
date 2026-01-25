@@ -123,7 +123,7 @@ async function handleJobTimeout(jobId, workerId) {
         workerStatus[workerId] = 'IDLE';
 
         io.emit('system-alert', {
-            message: `Worker ${workerId} was unresponsive. Process terminated and rebooted.`,
+            message: `Worker ${workerId} timed out after 75 seconds. This is an intentional feature to prevent frozen jobs from blocking the queue.`,
             workerId
         });
 
