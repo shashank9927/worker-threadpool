@@ -31,6 +31,7 @@ const workerStatus = new Array(WORKER_COUNT).fill('IDLE');
 
 const WATCHDOG_TIMEOUT_MS = 75000;
 const jobTimeouts = new Map();
+const socketClientMap = new Map(); 
 
 function createWorker(workerId) {
     const worker = new Worker(path.join(__dirname, 'worker.js'));
@@ -356,6 +357,65 @@ app.post('/api/workers/:id/restart', async (req, res) => {
 io.on('connection', (socket) => {
     workerStatus.forEach((status, index) => {
         socket.emit('worker:status', { workerId: index, status });
+    });
+
+    // Register client when they identify themselves
+    socket.on('register', (clientId) => {
+        socketClientMap.set(socket.id, clientId);
+        console.log(`Client registered: ${clientId}`);
+    });
+
+    // Handle client disconnect - cancel their jobs
+    socket.on('disconnect', async () => {
+        const clientId = socketClientMap.get(socket.id);
+        if (!clientId) return;
+
+        socketClientMap.delete(socket.id);
+        console.log(`Client disconnected: ${clientId}`);
+
+        try {
+           
+            const processingJobs = await Job.find({
+                createdBy: clientId,
+                status: 'PROCESSING'
+            });
+
+            for (const job of processingJobs) {
+                const workerId = job.workerId;
+
+                
+                if (jobTimeouts.has(job._id.toString())) {
+                    clearTimeout(jobTimeouts.get(job._id.toString()));
+                    jobTimeouts.delete(job._id.toString());
+                }
+
+                
+                job.status = 'FAILED';
+                job.error = 'Client disconnected';
+                job.failedReason = 'ERROR';
+                await job.save();
+
+                io.emit('job:updated', job);
+
+                
+                if (workerId !== undefined && workerId !== null) {
+                    await workers[workerId].terminate();
+                    workers[workerId] = createWorker(workerId);
+                    workerStatus[workerId] = 'IDLE';
+                    io.emit('worker:status', { workerId, status: 'IDLE' });
+                }
+            }
+
+            
+            await Job.updateMany(
+                { createdBy: clientId, status: 'PENDING' },
+                { status: 'FAILED', error: 'Client disconnected', failedReason: 'ERROR' }
+            );
+
+            processQueue();
+        } catch (error) {
+            console.error('Error handling client disconnect:', error);
+        }
     });
 });
 

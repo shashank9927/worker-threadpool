@@ -81,6 +81,7 @@ export default function Home() {
     socket.on("connect", () => {
       setConnected(true);
       setIsWakingUp(false);
+      socket.emit("register", clientId); 
       fetchJobs();
     });
 
